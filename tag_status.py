@@ -4,6 +4,7 @@ from datetime import datetime
 from airflow.decorators import dag, task
 from airflow.operators.empty import EmptyOperator
 from airflow.models import Variable
+from airflow.providers.http.hooks.http import HttpHook
 
 # ---
 
@@ -13,7 +14,9 @@ from airflow.models import Variable
   max_active_runs=1,
   catchup=False)
 def tag_status_dag():
-  @task(multiple_outputs=True)
+  @task(
+    task_id='retrieve_variables',
+    multiple_outputs=True)
   def retrieve_variables():
     api_key = Variable.get('samsungskills_notion_key')
     database_ids = Variable.get('samsungskills_notion_database_ids', deserialize_json=True)
@@ -26,8 +29,10 @@ def tag_status_dag():
     }
   
   @task()
-  def find_target_records(target_tag: dict[str, Any]):
-    target_tag['formula']
+  def find_target_records(target_tag: dict[str, Any], ti):
+    api_key = ti.xcom_pull(task_ids='retrieve_variables')['api_key']
+    db_id = ti.xcom_pull(task_ids='retrieve_variables')['db_id']
+
     pass
 
   @task.branch()
@@ -41,24 +46,25 @@ def tag_status_dag():
 
   target_tags = [
     {
-      "formula": 0,
-      "status": "\u200f\u200f\u200e \u200e\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e\u200eTODO\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e\u200f\u200f\u200e \u200e"
+      'formula': 0,
+      'status': "\u200f\u200f\u200e \u200e\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e\u200eTODO\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e\u200f\u200f\u200e \u200e"
     },
     {
-      "formula": 1,
-      "status": "\u200f\u200f\u200e \u200eIn Progress\u200f\u200f\u200e \u200e"
+      'formula': 1,
+      'status': "\u200f\u200f\u200e \u200eIn Progress\u200f\u200f\u200e \u200e"
     },
     {
-      "formula": 2,
-      "status": "\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200eDone\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e"
+      'formula': 2,
+      'status': "\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200eDone\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e"
     }
   ]
 
+  retrieve_variables()
+
   for idx, target_tag in enumerate(target_tags): 
     (
-      retrieve_variables() >>
-      find_target_records.override(task_id=f"find_target_records_{idx}")(target_tag) >>
-      check_target_records(idx) >>
+      find_target_records.override(task_id=f'find_target_records_{idx}')(target_tag) >>
+      check_target_records.override(task_id=f'check_target_records{idx}')(idx) >>
       [done_task]
     )
 
