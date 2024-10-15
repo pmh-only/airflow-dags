@@ -17,7 +17,7 @@ def tag_status_dag():
   def retrieve_variables():
     api_key = Variable.get('samsungskills_notion_key')
     database_ids = Variable.get('samsungskills_notion_database_ids', deserialize_json=True)
-    target_tags = Variable.get('samsungskills_notion_target_tags')
+    target_tags = Variable.get('samsungskills_notion_target_tags', deserialize_json=True)
 
     db_id = database_ids['plan_db']
 
