@@ -56,7 +56,7 @@ def tag_status_dag():
 
   for idx, target_tag in enumerate(target_tags): 
     (
-      retrieve_variables >>
+      retrieve_variables() >>
       find_target_records.override(task_id=f"find_target_records_{idx}")(target_tag) >>
       check_target_records(idx) >>
       [done_task]
