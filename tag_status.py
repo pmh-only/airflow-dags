@@ -17,28 +17,50 @@ def tag_status_dag():
   def retrieve_variables():
     api_key = Variable.get('samsungskills_notion_key')
     database_ids = Variable.get('samsungskills_notion_database_ids', deserialize_json=True)
-    target_tags = Variable.get('samsungskills_notion_target_tags', deserialize_json=True)
 
     db_id = database_ids['plan_db']
 
     return {
       'api_key': api_key,
       'db_id': db_id,
-      'target_tags': target_tags
     }
   
   @task()
-  def find_target_records(target_tag: dict[str, Any], api_key: str, db_id: str):
+  def find_target_records(target_tag: dict[str, Any]):
+    target_tag['formula']
     pass
+
+  @task.branch()
+  def check_target_records(idx: int, ti):
+    print(idx, ti)
+    return 'done_task'
   
   done_task = EmptyOperator(task_id='done_task')
 
   # ---
 
-  variables = retrieve_variables()
+  target_tags = [
+    {
+      "formula": 0,
+      "status": "\u200f\u200f\u200e \u200e\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e\u200eTODO\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e\u200f\u200f\u200e \u200e"
+    },
+    {
+      "formula": 1,
+      "status": "\u200f\u200f\u200e \u200eIn Progress\u200f\u200f\u200e \u200e"
+    },
+    {
+      "formula": 2,
+      "status": "\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200eDone\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e"
+    }
+  ]
 
-  for idx, target_tag in enumerate(variables['target_tags']):
-    retrieve_variables >> find_target_records(target_tag, variables['api_key'], variables['db_id']) >> done_task
+  for idx, target_tag in enumerate(target_tags): 
+    (
+      retrieve_variables >>
+      find_target_records.override(task_id=f"find_target_records_{idx}")(target_tag) >>
+      check_target_records(idx) >>
+      [done_task]
+    )
 
 # ---
 
