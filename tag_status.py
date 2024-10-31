@@ -70,12 +70,29 @@ def tag_status_dag():
     
     response.raise_for_status()
     return response.json()
+  
+  @task.short_circuit
+  def condition_is_exist(item):
+    return len(item['results']) > 0
+  
+  @task()
+  def update_item(item):
+    print(item)
 
   # ---
 
   for status_name, status_tag in status_tags.items():
-    get_incorrecly_tagged_item \
+    incorrecly_tagged_items = get_incorrecly_tagged_item \
       .override(task_id=f"get_incorrecly_tagged_item__{status_name}") \
                (status_tag['label'], status_tag['formula'])
+    
+    condition_is_exist \
+      .override(task_id=f"condition_is_exist__{status_name}") \
+               (incorrecly_tagged_items)
+    
+    update_item \
+      .override(task_id=f"update_item__{status_name}") \
+               (incorrecly_tagged_items)
+
 
 tag_status_dag()
