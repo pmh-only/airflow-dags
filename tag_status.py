@@ -1,73 +1,69 @@
-from typing import Any
 from datetime import datetime
-
 from airflow.decorators import dag, task
-from airflow.operators.empty import EmptyOperator
 from airflow.models import Variable
-from airflow.providers.http.hooks.http import HttpHook
+
+import requests
 
 # ---
 
 @dag(
+  dag_id='tag_status_dag',
   start_date=datetime(2024, 10, 14),
   schedule='@continuous',
   max_active_runs=1,
-  catchup=False)
+  catchup=False
+)
 def tag_status_dag():
-  @task(
-    task_id='retrieve_variables',
-    multiple_outputs=True)
-  def retrieve_variables():
-    api_key = Variable.get('samsungskills_notion_key')
-    database_ids = Variable.get('samsungskills_notion_database_ids', deserialize_json=True)
+  database_ids = Variable.get("samsungskills_notion_database_ids", deserialize_json=True)
+  status_tags = Variable.get("samsungskills_notion_database_status_tags", deserialize_json=True)
 
-    db_id = database_ids['plan_db']
+  notion_key = Variable.get("samsungskills_notion_key")
 
-    return {
-      'api_key': api_key,
-      'db_id': db_id,
-    }
-  
   @task()
-  def find_target_records(target_tag: dict[str, Any], ti):
-    api_key = ti.xcom_pull(task_ids='retrieve_variables')['api_key']
-    db_id = ti.xcom_pull(task_ids='retrieve_variables')['db_id']
+  def get_incorrecly_tagged_item(label: str, formula: int):
+    url = f"https://api.notion.com/v1/databases/{database_ids['tag_status']}/query"
 
-    pass
+    headers = {
+      "Authorization": f"Bearer {notion_key}",
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json"
+    }
 
-  @task.branch()
-  def check_target_records(idx: int, ti):
-    print(idx, ti)
-    return 'done_task'
-  
-  done_task = EmptyOperator(task_id='done_task')
+    response = requests.post(url, headers=headers, json={
+      'filter': {
+        'and': [
+          {
+            'property': 'Category',
+            'select': {
+              'equals': 'Service breakdown'
+            }
+          },
+          {
+            'property': 'Automation-#1',
+            'formula': {
+              'number': {
+                'equals': formula
+              }
+            }
+          },
+          {
+            'property': 'Status',
+            'select': {
+              'does_not_equal': label
+            }
+          }
+        ]
+      }
+    })
+    
+    response.raise_for_status()
+    return response.json()
 
   # ---
 
-  target_tags = [
-    {
-      'formula': 0,
-      'status': "\u200f\u200f\u200e \u200e\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e\u200eTODO\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e\u200f\u200f\u200e \u200e"
-    },
-    {
-      'formula': 1,
-      'status': "\u200f\u200f\u200e \u200eIn Progress\u200f\u200f\u200e \u200e"
-    },
-    {
-      'formula': 2,
-      'status': "\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200eDone\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e\u200f\u200f\u200e \u200e"
-    }
-  ]
+  for status_name, status_tag in status_tags.items():
+    get_incorrecly_tagged_item \
+      .override(task_id=f"get_incorrecly_tagged_item__{status_name}") \
+               (status_tag['label'], status_tag['formula'])
 
-  retrieve_variables()
-
-  for idx, target_tag in enumerate(target_tags): 
-    (
-      find_target_records.override(task_id=f'find_target_records_{idx}')(target_tag) >>
-      check_target_records.override(task_id=f'check_target_records{idx}')(idx) >>
-      [done_task]
-    )
-
-# ---
-
-tag_status = tag_status_dag()
+tag_status_dag()
