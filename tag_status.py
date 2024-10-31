@@ -51,6 +51,18 @@ def tag_status_dag():
             'select': {
               'does_not_equal': label
             }
+          },
+          {
+            'property': 'Status',
+            'select': {
+              'does_not_equal': 'Not yet'
+            }
+          },
+          {
+            'property': 'Status',
+            'select': {
+              'is_not_empty': True
+            }
           }
         ]
       }
