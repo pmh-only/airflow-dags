@@ -76,8 +76,27 @@ def tag_status_dag():
     return len(item['results']) > 0
   
   @task()
-  def update_item(item):
-    print(item)
+  def update_item(items, label: str):
+    for item in items['results']:
+      url = f"https://api.notion.com/v1/pages/{item['id']}"
+
+      headers = {
+        "Authorization": f"Bearer {notion_key}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+      }
+
+      response = requests.patch(url, headers=headers, json={
+        'properties': {
+          'Status': {
+            'select': {
+              'name': label
+            }
+          }
+        }
+      })
+
+      response.raise_for_status()
 
   # ---
 
@@ -91,7 +110,7 @@ def tag_status_dag():
                (incorrecly_tagged_items) >> \
     update_item \
       .override(task_id=f"update_item__{status_name}") \
-               (incorrecly_tagged_items)
+               (incorrecly_tagged_items, status_tag['label'])
 
 
 tag_status_dag()
