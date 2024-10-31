@@ -88,8 +88,7 @@ def tag_status_dag():
     
     condition_is_exist \
       .override(task_id=f"condition_is_exist__{status_name}") \
-               (incorrecly_tagged_items)
-    
+               (incorrecly_tagged_items) >> \
     update_item \
       .override(task_id=f"update_item__{status_name}") \
                (incorrecly_tagged_items)
