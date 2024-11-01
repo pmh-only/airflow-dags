@@ -11,7 +11,8 @@ import requests
   start_date=datetime(2024, 10, 14),
   schedule='@continuous',
   max_active_runs=1,
-  catchup=False
+  catchup=False,
+  tags=['samsungskills', 'notion', 'automation']
 )
 def tag_status_dag():
   database_ids = Variable.get("samsungskills_notion_database_ids", deserialize_json=True)
